@@ -4,7 +4,7 @@ import EditorLib
 from EditorLib.EditOptions import HelpButton
 from EditorLib.EditOptions import EditOptions
 from EditorLib import EditUtil
-from EditorLib import LabelEffect
+from EditorLib import Effect
 
 #
 # The Editor Extension itself.
@@ -16,7 +16,7 @@ from EditorLib import LabelEffect
 # FastMarchingEffectOptions - see LabelEffect, EditOptions and Effect for superclasses
 #
 
-class FastMarchingEffectOptions(EditorLib.LabelEffectOptions):
+class FastMarchingEffectOptions(Effect.EffectOptions):
   """ FastMarchingEffect-specfic gui
   """
 
@@ -45,6 +45,7 @@ class FastMarchingEffectOptions(EditorLib.LabelEffectOptions):
     self.marcher.minimum = 0
     self.marcher.maximum = 1
     self.marcher.singleStep = 0.01
+    self.frame.layout().addWidget(self.marcher)
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
 
@@ -121,7 +122,7 @@ class FastMarchingEffectOptions(EditorLib.LabelEffectOptions):
 # FastMarchingEffectTool
 #
 
-class FastMarchingEffectTool(LabelEffect.LabelEffectTool):
+class FastMarchingEffectTool(Effect.EffectTool):
   """
   One instance of this will be created per-view when the effect
   is selected.  It is responsible for implementing feedback and
@@ -176,12 +177,13 @@ class FastMarchingEffectTool(LabelEffect.LabelEffectTool):
         for k in range(dim[5]+1):
           labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
           if labelValue:
+            print('Adding seed at ('+str(i)+','+str(j)+','+str(k)+')')
             self.fm.addSeedIJK(i,j,k)
 
     self.fm.Modified()
     self.fm.Update()
     
-    print('FastMarching apply called!')
+    print('FastMarching apply update completed')
 
   def updateLabel(self,value):
     if not self.fm:
@@ -196,7 +198,7 @@ class FastMarchingEffectTool(LabelEffect.LabelEffectTool):
 # FastMarchingEffectLogic
 #
 
-class FastMarchingEffectLogic(LabelEffect.LabelEffectLogic):
+class FastMarchingEffectLogic(Effect.EffectLogic):
   """
   This class contains helper methods for a given effect
   type.  It can be instanced as needed by an FastMarchingEffectTool
@@ -218,7 +220,7 @@ class FastMarchingEffectLogic(LabelEffect.LabelEffectLogic):
 # The FastMarchingEffectExtension class definition
 #
 
-class FastMarchingEffectExtension(LabelEffect.LabelEffect):
+class FastMarchingEffectExtension(Effect.Effect):
   """Organizes the Options, Tool, and Logic classes into a single instance
   that can be managed by the EditBox
   """
