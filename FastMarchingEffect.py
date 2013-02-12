@@ -27,7 +27,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     # 'MouseTool' - grabs the cursor
     # 'Nonmodal' - can be applied while another is active
     # 'Disabled' - not available
-    self.attributes = ('MouseTool')
+    # self.attributes = ('MouseTool')
     self.displayName = 'FastMarchingEffect Effect'
 
   def __del__(self):
@@ -144,6 +144,8 @@ class FastMarchingEffectTool(Effect.EffectTool):
     """
     handle events from the render window interactor
     """
+    pass
+
     if event == "LeftButtonPressEvent":
       xy = self.interactor.GetEventPosition()
       sliceLogic = self.sliceWidget.sliceLogic()
@@ -160,28 +162,48 @@ class FastMarchingEffectTool(Effect.EffectTool):
     bgImage = self.editUtil.getBackgroundImage()
     labelImage = self.editUtil.getLabelImage()
 
-    self.fm = slicer.logic.vtkPichonFastMarching()
-    scalarRange = bgImage.GetScalarRange()
+    # collect seeds
     dim = bgImage.GetWholeExtent()
-    depth = scalarRange[1]-scalarRange[0]
-    self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
-    self.fm.SetInput(bgImage)
-    self.fm.SetOutput(labelImage)
-
-    self.fm.setNPointsEvolution(100000)
-    self.fm.setActiveLabel(self.editUtil.getLabel())
-
-    # use all initialized points in the label volume as seeds
+    print('Image extent: '+str(dim))
+    seeds = []
+    seeds = [ [141,128,63], [147,128,68], [142,128,55] ]
+    '''
     for i in range(dim[1]+1):
       for j in range(dim[3]+1):
         for k in range(dim[5]+1):
           labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
           if labelValue:
             print('Adding seed at ('+str(i)+','+str(j)+','+str(k)+')')
-            self.fm.addSeedIJK(i,j,k)
+            seeds.append([i,j,k])
+    '''
+
+    # initialize the filter
+    self.fm = slicer.logic.vtkPichonFastMarching()
+    scalarRange = bgImage.GetScalarRange()
+    depth = scalarRange[1]-scalarRange[0]
+    print('Input scalar range: '+str(depth))
+    self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
+    self.fm.SetInput(bgImage)
+    self.fm.SetOutput(labelImage)
+
+    self.fm.setNPointsEvolution(100000)
+    print('Setting active label to '+str(self.editUtil.getLabel()))
+    self.fm.setActiveLabel(self.editUtil.getLabel())
+
+    # use all initialized points in the label volume as seeds
+    for s in seeds:
+      print('FM adds seed '+str(s))
+      self.fm.addSeedIJK(s[0],s[1],s[2])
 
     self.fm.Modified()
     self.fm.Update()
+
+    self.fm.show(1)
+    self.fm.Modified()
+    self.fm.Update()
+
+    output = self.fm.GetOutput()
+    print('FastMarching output image: '+str(output))
     
     print('FastMarching apply update completed')
 
