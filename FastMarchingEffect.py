@@ -96,8 +96,6 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
       print('No tools available!')
       pass
     
-    self.defaultEffect()
-
   def onMarcherChanged(self,value):
     print('Marcher changed!')
     try:
@@ -144,7 +142,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     """
     handle events from the render window interactor
     """
-    pass
+    return
 
     if event == "LeftButtonPressEvent":
       xy = self.interactor.GetEventPosition()
@@ -166,8 +164,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     dim = bgImage.GetWholeExtent()
     print('Image extent: '+str(dim))
     seeds = []
-    seeds = [ [141,128,63], [147,128,68], [142,128,55] ]
-    '''
+    # seeds = [ [141,128,63], [147,128,68], [142,128,55] ]
     for i in range(dim[1]+1):
       for j in range(dim[3]+1):
         for k in range(dim[5]+1):
@@ -175,7 +172,6 @@ class FastMarchingEffectTool(Effect.EffectTool):
           if labelValue:
             print('Adding seed at ('+str(i)+','+str(j)+','+str(k)+')')
             seeds.append([i,j,k])
-    '''
 
     # initialize the filter
     self.fm = slicer.logic.vtkPichonFastMarching()
@@ -184,7 +180,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     print('Input scalar range: '+str(depth))
     self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
     self.fm.SetInput(bgImage)
-    self.fm.SetOutput(labelImage)
+    # self.fm.SetOutput(labelImage)
 
     self.fm.setNPointsEvolution(100000)
     print('Setting active label to '+str(self.editUtil.getLabel()))
@@ -202,8 +198,16 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.fm.Modified()
     self.fm.Update()
 
-    output = self.fm.GetOutput()
-    print('FastMarching output image: '+str(output))
+    self.fm.show(1)
+    self.fm.Modified()
+    self.fm.Update()
+
+
+    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
+    self.editUtil.getLabelImage().Modified()
+
+    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
+    # print('FastMarching output image: '+str(output))
     
     print('FastMarching apply update completed')
 
@@ -213,6 +217,11 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.fm.show(value)
     self.fm.Modified()
     self.fm.Update()
+
+    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
+    self.editUtil.getLabelImage().Modified()
+    
+    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
 
     print('FastMarching updated!')
 
