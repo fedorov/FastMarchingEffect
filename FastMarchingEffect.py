@@ -190,6 +190,17 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.fm = slicer.logic.vtkPichonFastMarching()
     scalarRange = bgImage.GetScalarRange()
     depth = scalarRange[1]-scalarRange[0]
+
+    if depth>300:
+      scaleValue = 300./depth
+      rescale = vtk.vtkImageShiftScale()
+      rescale.SetInput(bgImage)
+      rescale.SetScale(scaleValue)
+      rescale.SetShift(0)
+      rescale.Update()
+      bgImage = rescale.GetOutput()
+      depth = 300
+
     print('Input scalar range: '+str(depth))
     self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
     self.fm.SetInput(bgImage)
