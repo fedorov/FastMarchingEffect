@@ -36,6 +36,31 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
   def create(self):
     super(FastMarchingEffectOptions,self).create()
 
+    self.percentLabel = qt.QLabel('Expected structure volume as % of image volume:',self.frame)
+    self.percentLabel.setToolTip('Segmentation will grow from the seed label until this value is reached')
+    self.frame.layout().addWidget(self.percentLabel)
+    self.widgets.append(self.percentLabel)
+
+    self.percentMax = ctk.ctkSliderWidget(self.frame)
+    self.percentMax.minimum = 0
+    self.percentMax.maximum = 100
+    self.percentMax.singleStep = 1
+    self.percentMax.value = 100
+    self.percentMax.setToolTip('Approximate volume of the structure to be segmented relative to the total volume of the image')
+    self.frame.layout().addWidget(self.percentMax)
+    self.widgets.append(self.percentMax)
+    self.percentMax.connect('valueChanged(double)', self.percentMaxChanged)
+
+    self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
+    self.percentVolume.setToolTip('Total maximum volume')
+    self.frame.layout().addWidget(self.percentVolume)
+    self.widgets.append(self.percentVolume)
+
+    self.apply = qt.QPushButton("Apply", self.frame)
+    self.apply.setToolTip("Apply the extension operation")
+    self.frame.layout().addWidget(self.apply)
+    self.widgets.append(self.apply)
+
     self.marcherLabel = qt.QLabel('March:',self.frame)
     self.marcherLabel.setToolTip('March over the front propagation timeline')
     self.frame.layout().addWidget(self.marcherLabel)
@@ -49,12 +74,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
 
-    self.apply = qt.QPushButton("Apply", self.frame)
-    self.apply.setToolTip("Apply the extension operation")
-    self.frame.layout().addWidget(self.apply)
-    self.widgets.append(self.apply)
-
-    HelpButton(self.frame, "This is a sample with no real functionality.")
+    HelpButton(self.frame, "To use FastMarching effect, first mark the areas that belong to the structure of interest to initialize the algorithm. Define the expected volume of the structure you are trying to segment, and hit Apply.\nAfter computation is complete, use the Marcher slider to go over the segmentation history.")
 
     self.apply.connect('clicked()', self.onApply)
 
@@ -91,13 +111,12 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
 
     try:
       tool = self.tools[0]
-      tool.apply()
+      tool.apply(self.percentMax.value)
     except IndexError:
       print('No tools available!')
       pass
     
   def onMarcherChanged(self,value):
-    print('Marcher changed!')
     try:
       tool = self.tools[0]
       tool.updateLabel(value)
@@ -105,6 +124,21 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
       print('No tools available!')
       pass
 
+  def percentMaxChanged(self, val):
+    try:
+      tool = self.tools[0]
+    except IndexError:
+      print('No tools available!')
+      return
+
+    labelImage = self.editUtil.getLabelImage()
+    dim = labelImage.GetWholeExtent()
+    volumeNode = tool.getVolumeNode()
+    spacing = volumeNode.GetSpacing()
+    totalVolume = spacing[0]*(dim[1]+1)+spacing[1]*(dim[3]+1)+spacing[2]*(dim[5]+1)
+    percentVolumeStr = "%.5f" % (totalVolume*val/100.)
+    self.percentVolume.text = '(maximum total volume: '+percentVolumeStr+' mL)'
+  
   def updateMRMLFromGUI(self):
     if self.updatingGUI:
       return
@@ -144,17 +178,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     """
     return
 
-    if event == "LeftButtonPressEvent":
-      xy = self.interactor.GetEventPosition()
-      sliceLogic = self.sliceWidget.sliceLogic()
-      logic = FastMarchingEffectLogic(sliceLogic)
-      logic.apply(xy)
-      print("Got a %s at %s in %s", (event,str(xy),self.sliceWidget.sliceLogic().GetSliceNode().GetName()))
-      self.abortEvent(event)
-    else:
-      pass
-
-  def apply(self):
+  def apply(self, percentMax):
 
     # allocate a new filter each time apply is hit
     bgImage = self.editUtil.getBackgroundImage()
@@ -162,17 +186,6 @@ class FastMarchingEffectTool(Effect.EffectTool):
 
     # collect seeds
     dim = bgImage.GetWholeExtent()
-    print('Image extent: '+str(dim))
-    seeds = []
-    # seeds = [ [141,128,63], [147,128,68], [142,128,55] ]
-    for i in range(dim[1]+1):
-      for j in range(dim[3]+1):
-        for k in range(dim[5]+1):
-          labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
-          if labelValue:
-            print('Adding seed at ('+str(i)+','+str(j)+','+str(k)+')')
-            seeds.append([i,j,k])
-
     # initialize the filter
     self.fm = slicer.logic.vtkPichonFastMarching()
     scalarRange = bgImage.GetScalarRange()
@@ -182,14 +195,19 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.fm.SetInput(bgImage)
     # self.fm.SetOutput(labelImage)
 
-    self.fm.setNPointsEvolution(100000)
+    npoints = int((dim[1]+1)*(dim[3]+1)*(dim[5]+1)*percentMax/100.)
+
+    self.fm.setNPointsEvolution(npoints)
     print('Setting active label to '+str(self.editUtil.getLabel()))
     self.fm.setActiveLabel(self.editUtil.getLabel())
 
     # use all initialized points in the label volume as seeds
-    for s in seeds:
-      print('FM adds seed '+str(s))
-      self.fm.addSeedIJK(s[0],s[1],s[2])
+    for i in range(dim[1]+1):
+      for j in range(dim[3]+1):
+        for k in range(dim[5]+1):
+          labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
+          if labelValue:
+            self.fm.addSeedIJK(i,j,k)
 
     self.fm.Modified()
     self.fm.Update()
@@ -223,8 +241,8 @@ class FastMarchingEffectTool(Effect.EffectTool):
     
     self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
 
-    print('FastMarching updated!')
-
+  def getVolumeNode(self):
+    return self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode()
 #
 # FastMarchingEffectLogic
 #
@@ -286,13 +304,14 @@ class FastMarchingEffect:
   def __init__(self, parent):
     parent.title = "Editor FastMarchingEffect Effect"
     parent.categories = ["Developer Tools.Editor Extensions"]
-    parent.contributors = ["Andrey Fedorov (BWH)"] # insert your name in the list
+    parent.contributors = ["Andrey Fedorov (BWH)", "Steve Pieper (Isomics)", "Ron Kikinis (BWH)"] # insert your name in the list
     parent.helpText = """
     FastMarching segmentation based on work of Eric Pichon.
     """
     parent.acknowledgementText = """
     This editor extension was developed by
-    <Author>, <Institution>
+    Andrey Fedorov, BWH supported by NIH grants CA151261, RR019703 and
+    CA111288
     based on work by:
     Steve Pieper, Isomics, Inc.
     based on work by:
