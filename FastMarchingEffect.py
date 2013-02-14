@@ -212,6 +212,9 @@ class FastMarchingEffectTool(Effect.EffectTool):
     print('Setting active label to '+str(self.editUtil.getLabel()))
     self.fm.setActiveLabel(self.editUtil.getLabel())
 
+    self.fm.addSeedsFromImage(labelImage)
+
+    '''
     # use all initialized points in the label volume as seeds
     for i in range(dim[1]+1):
       for j in range(dim[3]+1):
@@ -219,6 +222,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
           labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
           if labelValue:
             self.fm.addSeedIJK(i,j,k)
+    '''
 
     self.fm.Modified()
     self.fm.Update()
