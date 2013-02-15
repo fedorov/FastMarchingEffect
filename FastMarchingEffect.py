@@ -13,7 +13,7 @@ from EditorLib import Effect
 #
 
 #
-# FastMarchingEffectOptions - see LabelEffect, EditOptions and Effect for superclasses
+# FastMarchingEffectOptions - see EditOptions and Effect for superclasses
 #
 
 class FastMarchingEffectOptions(Effect.EffectOptions):
@@ -103,19 +103,16 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.disconnectWidgets()
     # TODO: get the march parameter from the node
     # march = float(self.parameterNode.GetParameter
-
     self.connectWidgets()
 
   def onApply(self):
-    print('This is just an example - nothing here yet')
-
     try:
       tool = self.tools[0]
       tool.apply(self.percentMax.value)
     except IndexError:
       print('No tools available!')
       pass
-    
+
   def onMarcherChanged(self,value):
     try:
       tool = self.tools[0]
@@ -138,7 +135,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     totalVolume = spacing[0]*(dim[1]+1)+spacing[1]*(dim[3]+1)+spacing[2]*(dim[5]+1)
     percentVolumeStr = "%.5f" % (totalVolume*val/100.)
     self.percentVolume.text = '(maximum total volume: '+percentVolumeStr+' mL)'
-  
+
   def updateMRMLFromGUI(self):
     if self.updatingGUI:
       return
@@ -227,6 +224,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.fm.Modified()
     self.fm.Update()
 
+    # TODO: need to call show() twice for data to be updated
     self.fm.show(1)
     self.fm.Modified()
     self.fm.Update()
@@ -240,8 +238,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.editUtil.getLabelImage().Modified()
 
     self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
-    # print('FastMarching output image: '+str(output))
-    
+
     print('FastMarching apply update completed')
 
   def updateLabel(self,value):
@@ -253,11 +250,13 @@ class FastMarchingEffectTool(Effect.EffectTool):
 
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
-    
+
     self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
 
   def getVolumeNode(self):
     return self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode()
+
+
 #
 # FastMarchingEffectLogic
 #
@@ -293,19 +292,12 @@ class FastMarchingEffectExtension(Effect.Effect):
     # name is used to define the name of the icon image resource (e.g. FastMarchingEffect.png)
     self.name = "FastMarchingEffect"
     # tool tip is displayed on mouse hover
-    self.toolTip = "Paint: circular paint brush for label map editing"
+    self.toolTip = "FastMarchingEffect - a similarity based 3D region growing"
 
     self.options = FastMarchingEffectOptions
     self.tool = FastMarchingEffectTool
     self.logic = FastMarchingEffectLogic
 
-""" Test:
-
-sw = slicer.app.layoutManager().sliceWidget('Red')
-import EditorLib
-pet = EditorLib.FastMarchingEffectTool(sw)
-
-"""
 
 #
 # FastMarchingEffect
@@ -320,6 +312,7 @@ class FastMarchingEffect:
     parent.title = "Editor FastMarchingEffect Effect"
     parent.categories = ["Developer Tools.Editor Extensions"]
     parent.contributors = ["Andrey Fedorov (BWH)", "Steve Pieper (Isomics)", "Ron Kikinis (BWH)"] # insert your name in the list
+    parent.hidden = True
     parent.helpText = """
     FastMarching segmentation based on work of Eric Pichon.
     """
@@ -334,9 +327,6 @@ class FastMarchingEffect:
     and was partially funded by NIH grant 3P41RR013218.
     """
 
-    # TODO:
-    # don't show this module - it only appears in the Editor module
-    #parent.hidden = True
 
     # Add this extension to the editor's list for discovery when the module
     # is created.  Since this module may be discovered before the Editor itself,
@@ -364,5 +354,3 @@ class FastMarchingEffectWidget:
 
   def exit(self):
     pass
-
-
