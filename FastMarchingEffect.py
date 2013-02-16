@@ -38,6 +38,8 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
   def create(self):
     super(FastMarchingEffectOptions,self).create()
 
+    self.defaultMaxPercent = 30
+
     self.percentLabel = qt.QLabel('Expected structure volume as % of image volume:',self.frame)
     self.percentLabel.setToolTip('Segmentation will grow from the seed label until this value is reached')
     self.frame.layout().addWidget(self.percentLabel)
@@ -47,7 +49,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.percentMax.minimum = 0
     self.percentMax.maximum = 100
     self.percentMax.singleStep = 1
-    self.percentMax.value = 30
+    self.percentMax.value = self.defaultMaxPercent
     self.percentMax.setToolTip('Approximate volume of the structure to be segmented relative to the total volume of the image')
     self.frame.layout().addWidget(self.percentMax)
     self.widgets.append(self.percentMax)
@@ -83,6 +85,8 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
+
+    self.percentMaxChanged(self.percentMax.value)
 
   def destroy(self):
     super(FastMarchingEffectOptions,self).destroy()
@@ -122,23 +126,13 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
       pass
     
   def onMarcherChanged(self,value):
-    try:
-      self.logic.updateLabel(value)
-    except IndexError:
-      print('No tools available!')
-      pass
+    self.logic.updateLabel(value)
 
   def percentMaxChanged(self, val):
-    try:
-      tool = self.tools[0]
-    except IndexError:
-      print('No tools available!')
-      return
-
+    labelNode = self.logic.getLabelNode()
     labelImage = self.editUtil.getLabelImage()
     dim = labelImage.GetWholeExtent()
-    volumeNode = tool.getVolumeNode()
-    spacing = volumeNode.GetSpacing()
+    spacing = labelNode.GetSpacing()
     totalVolume = spacing[0]*(dim[1]+1)+spacing[1]*(dim[3]+1)+spacing[2]*(dim[5]+1)
     percentVolumeStr = "%.5f" % (totalVolume*val/100.)
     self.percentVolume.text = '(maximum total volume: '+percentVolumeStr+' mL)'
@@ -200,7 +194,6 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
   def __init__(self,sliceLogic):
     super(FastMarchingEffectLogic,self).__init__(sliceLogic)
-    # self.sliceLogic = sliceLogic
 
   def fastMarching(self,percentMax):
 
@@ -254,6 +247,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
     self.fm.Modified()
     self.fm.Update()
 
+    self.undoRedo.saveState()
 
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
@@ -277,7 +271,8 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
     
     self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
 
-
+  def getLabelNode(self):
+    return self.sliceLogic.GetLabelLayer().GetVolumeNode()
 
 
 #
