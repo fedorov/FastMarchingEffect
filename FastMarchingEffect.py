@@ -30,6 +30,8 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     # self.attributes = ('MouseTool')
     self.displayName = 'FastMarchingEffect Effect'
 
+    self.logic = FastMarchingEffectLogic(self.editUtil.getSliceLogic())
+
   def __del__(self):
     super(FastMarchingEffectOptions,self).__del__()
 
@@ -108,11 +110,11 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.connectWidgets()
 
   def onApply(self):
-    print('This is just an example - nothing here yet')
-
     try:
-      tool = self.tools[0]
-      success = tool.apply(self.percentMax.value)
+      slicer.util.showStatusMessage('Running FastMarching...', 2000)
+      self.logic.undoRedo = self.undoRedo
+      success = self.logic.fastMarching(self.percentMax.value)
+      slicer.util.showStatusMessage('FastMarching finished', 2000)
       if success:
         self.marcher.enabled = 1
     except IndexError:
@@ -121,8 +123,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     
   def onMarcherChanged(self,value):
     try:
-      tool = self.tools[0]
-      tool.updateLabel(value)
+      self.logic.updateLabel(value)
     except IndexError:
       print('No tools available!')
       pass
@@ -170,7 +171,6 @@ class FastMarchingEffectTool(Effect.EffectTool):
   def __init__(self, sliceWidget):
     super(FastMarchingEffectTool,self).__init__(sliceWidget)
 
-    self.fm = None
 
   def cleanup(self):
     super(FastMarchingEffectTool,self).cleanup()
@@ -181,8 +181,30 @@ class FastMarchingEffectTool(Effect.EffectTool):
     """
     return
 
-  def apply(self, percentMax):
+  def getVolumeNode(self):
+    return self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode()
+#
+# FastMarchingEffectLogic
+#
 
+class FastMarchingEffectLogic(Effect.EffectLogic):
+  """
+  This class contains helper methods for a given effect
+  type.  It can be instanced as needed by an FastMarchingEffectTool
+  or FastMarchingEffectOptions instance in order to compute intermediate
+  results (say, for user feedback) or to implement the final
+  segmentation editing operation.  This class is split
+  from the FastMarchingEffectTool so that the operations can be used
+  by other code without the need for a view context.
+  """
+
+  def __init__(self,sliceLogic):
+    super(FastMarchingEffectLogic,self).__init__(sliceLogic)
+    # self.sliceLogic = sliceLogic
+
+  def fastMarching(self,percentMax):
+
+    self.fm = None
     # allocate a new filter each time apply is hit
     bgImage = self.editUtil.getBackgroundImage()
     labelImage = self.editUtil.getLabelImage()
@@ -236,7 +258,7 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
 
-    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
+    self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
     # print('FastMarching output image: '+str(output))
     
     print('FastMarching apply update completed')
@@ -253,30 +275,9 @@ class FastMarchingEffectTool(Effect.EffectTool):
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
     
-    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
+    self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
 
-  def getVolumeNode(self):
-    return self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode()
-#
-# FastMarchingEffectLogic
-#
 
-class FastMarchingEffectLogic(Effect.EffectLogic):
-  """
-  This class contains helper methods for a given effect
-  type.  It can be instanced as needed by an FastMarchingEffectTool
-  or FastMarchingEffectOptions instance in order to compute intermediate
-  results (say, for user feedback) or to implement the final
-  segmentation editing operation.  This class is split
-  from the FastMarchingEffectTool so that the operations can be used
-  by other code without the need for a view context.
-  """
-
-  def __init__(self,sliceLogic):
-    self.sliceLogic = sliceLogic
-
-  def apply(self,xy):
-    pass
 
 
 #
@@ -310,7 +311,7 @@ pet = EditorLib.FastMarchingEffectTool(sw)
 # FastMarchingEffect
 #
 
-class FastMarchingEffect:
+class FastMarchingEffect(): #Effect.Effect):
   """
   This class is the 'hook' for slicer to detect and recognize the extension
   as a loadable scripted module
@@ -346,10 +347,15 @@ class FastMarchingEffect:
       slicer.modules.editorExtensions = {}
     slicer.modules.editorExtensions['FastMarchingEffect'] = FastMarchingEffectExtension
 
+    '''
+    self.options = FastMarchingEffectOptions
+    self.tool = FastMarchingEffectTool
+    self.logic = FastMarchingEffectLogic
+    '''
 #
 # FastMarchingEffectWidget
 #
-
+'''
 class FastMarchingEffectWidget:
   def __init__(self, parent = None):
     self.parent = parent
@@ -363,5 +369,5 @@ class FastMarchingEffectWidget:
 
   def exit(self):
     pass
-
+'''
 
