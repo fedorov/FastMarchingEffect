@@ -45,7 +45,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.percentMax.minimum = 0
     self.percentMax.maximum = 100
     self.percentMax.singleStep = 1
-    self.percentMax.value = 100
+    self.percentMax.value = 30
     self.percentMax.setToolTip('Approximate volume of the structure to be segmented relative to the total volume of the image')
     self.frame.layout().addWidget(self.percentMax)
     self.widgets.append(self.percentMax)
@@ -70,6 +70,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.marcher.minimum = 0
     self.marcher.maximum = 1
     self.marcher.singleStep = 0.01
+    self.marcher.enabled = 0
     self.frame.layout().addWidget(self.marcher)
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
@@ -111,7 +112,9 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
 
     try:
       tool = self.tools[0]
-      tool.apply(self.percentMax.value)
+      success = tool.apply(self.percentMax.value)
+      if success:
+        self.marcher.enabled = 1
     except IndexError:
       print('No tools available!')
       pass
@@ -191,6 +194,8 @@ class FastMarchingEffectTool(Effect.EffectTool):
     scalarRange = bgImage.GetScalarRange()
     depth = scalarRange[1]-scalarRange[0]
 
+    # this is more or less arbitrary; large depth values will bring the
+    # algorithm to the knees
     if depth>300:
       scaleValue = 300./depth
       rescale = vtk.vtkImageShiftScale()
@@ -212,17 +217,9 @@ class FastMarchingEffectTool(Effect.EffectTool):
     print('Setting active label to '+str(self.editUtil.getLabel()))
     self.fm.setActiveLabel(self.editUtil.getLabel())
 
-    self.fm.addSeedsFromImage(labelImage)
-
-    '''
-    # use all initialized points in the label volume as seeds
-    for i in range(dim[1]+1):
-      for j in range(dim[3]+1):
-        for k in range(dim[5]+1):
-          labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
-          if labelValue:
-            self.fm.addSeedIJK(i,j,k)
-    '''
+    nSeeds = self.fm.addSeedsFromImage(labelImage)
+    if nSeeds == 0:
+      return False
 
     self.fm.Modified()
     self.fm.Update()
@@ -243,6 +240,8 @@ class FastMarchingEffectTool(Effect.EffectTool):
     # print('FastMarching output image: '+str(output))
     
     print('FastMarching apply update completed')
+
+    return True
 
   def updateLabel(self,value):
     if not self.fm:
