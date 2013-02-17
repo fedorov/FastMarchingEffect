@@ -214,19 +214,33 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     # this is more or less arbitrary; large depth values will bring the
     # algorithm to the knees
+    scaleValue = 0
+    shiftValue = 0
+
     if depth>300:
       scaleValue = 300./depth
+    if scalarRange[0] < 0:
+      shiftValue = scalarRange[0]*-1
+
+    if scaleValue or shiftValue:
       rescale = vtk.vtkImageShiftScale()
       rescale.SetInput(bgImage)
       rescale.SetScale(scaleValue)
-      rescale.SetShift(0)
+      rescale.SetShift(shiftValue)
       rescale.Update()
       bgImage = rescale.GetOutput()
-      depth = 300
+      scalarRange = bgImage.GetScalarRange()
+      depth = scalarRange[1]-scalarRange[0]
 
     print('Input scalar range: '+str(depth))
     self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
-    self.fm.SetInput(bgImage)
+
+    caster = vtk.vtkImageCast()
+    caster.SetOutputScalarTypeToShort()
+    caster.SetInput(bgImage)
+    caster.Update()
+
+    self.fm.SetInput(caster.GetOutput())
     # self.fm.SetOutput(labelImage)
 
     npoints = int((dim[1]+1)*(dim[3]+1)*(dim[5]+1)*percentMax/100.)
