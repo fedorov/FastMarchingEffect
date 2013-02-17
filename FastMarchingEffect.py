@@ -117,16 +117,19 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     try:
       slicer.util.showStatusMessage('Running FastMarching...', 2000)
       self.logic.undoRedo = self.undoRedo
-      success = self.logic.fastMarching(self.percentMax.value)
+      npoints = self.logic.fastMarching(self.percentMax.value)
       slicer.util.showStatusMessage('FastMarching finished', 2000)
-      if success:
+      if npoints:
+        self.marcher.minimum = 0
+        self.marcher.maximum = npoints
+        self.marcher.singleStep = 1
         self.marcher.enabled = 1
     except IndexError:
       print('No tools available!')
       pass
     
   def onMarcherChanged(self,value):
-    self.logic.updateLabel(value)
+    self.logic.updateLabel(value/self.marcher.maximum)
 
   def percentMaxChanged(self, val):
     labelNode = self.logic.getLabelNode()
@@ -234,7 +237,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     nSeeds = self.fm.addSeedsFromImage(labelImage)
     if nSeeds == 0:
-      return False
+      return 0
 
     self.fm.Modified()
     self.fm.Update()
@@ -257,7 +260,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
     
     print('FastMarching apply update completed')
 
-    return True
+    return npoints
 
   def updateLabel(self,value):
     if not self.fm:
