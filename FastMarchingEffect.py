@@ -55,13 +55,8 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.widgets.append(self.percentMax)
     self.percentMax.connect('valueChanged(double)', self.percentMaxChanged)
 
-    self.marcherLabel = qt.QLabel('March:',self.frame)
-    self.marcherLabel.setToolTip('March over the front propagation timeline')
-    self.frame.layout().addWidget(self.marcherLabel)
-    self.widgets.append(self.marcherLabel)
-
     self.march = qt.QPushButton("March", self.frame)
-    self.march.setToolTip("Perform the Marching operatino into the current label map")
+    self.march.setToolTip("Perform the Marching operation into the current label map")
     self.frame.layout().addWidget(self.march)
     self.widgets.append(self.march)
 
@@ -327,13 +322,14 @@ class FastMarchingEffect():
     parent.contributors = ["Andrey Fedorov (BWH)", "Steve Pieper (Isomics)", "Ron Kikinis (BWH)"] # insert your name in the list
     parent.hidden = True
     parent.helpText = """
-    FastMarching segmentation based on work of Eric Pichon.
+    FastMarching segmentation based on work of Eric Pichon. 
     """
     parent.acknowledgementText = """
     This editor extension was developed by
-    Andrey Fedorov, BWH supported by NIH grants CA151261, RR019703 and
+    Andrey Fedorov, Steve Pieper and Ron Kikinis, BWH supported by NIH grants CA151261, RR019703 and
     CA111288
     based on work by:
+    Eric Pichon, Georgia Tech
     Steve Pieper, Isomics, Inc.
     based on work by:
     Jean-Christophe Fillion-Robin, Kitware Inc.
