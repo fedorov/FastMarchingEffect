@@ -30,11 +30,15 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     # self.attributes = ('MouseTool')
     self.displayName = 'FastMarchingEffect Effect'
 
+    self.logic = FastMarchingEffectLogic(self.editUtil.getSliceLogic())
+
   def __del__(self):
     super(FastMarchingEffectOptions,self).__del__()
 
   def create(self):
     super(FastMarchingEffectOptions,self).create()
+
+    self.defaultMaxPercent = 30
 
     self.percentLabel = qt.QLabel('Expected structure volume as % of image volume:',self.frame)
     self.percentLabel.setToolTip('Segmentation will grow from the seed label until this value is reached')
@@ -45,7 +49,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.percentMax.minimum = 0
     self.percentMax.maximum = 100
     self.percentMax.singleStep = 1
-    self.percentMax.value = 100
+    self.percentMax.value = self.defaultMaxPercent
     self.percentMax.setToolTip('Approximate volume of the structure to be segmented relative to the total volume of the image')
     self.frame.layout().addWidget(self.percentMax)
     self.widgets.append(self.percentMax)
@@ -70,6 +74,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.marcher.minimum = 0
     self.marcher.maximum = 1
     self.marcher.singleStep = 0.01
+    self.marcher.enabled = 0
     self.frame.layout().addWidget(self.marcher)
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
@@ -80,6 +85,8 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
+
+    self.percentMaxChanged(self.percentMax.value)
 
   def destroy(self):
     super(FastMarchingEffectOptions,self).destroy()
@@ -107,31 +114,27 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
 
   def onApply(self):
     try:
-      tool = self.tools[0]
-      tool.apply(self.percentMax.value)
+      slicer.util.showStatusMessage('Running FastMarching...', 2000)
+      self.logic.undoRedo = self.undoRedo
+      npoints = self.logic.fastMarching(self.percentMax.value)
+      slicer.util.showStatusMessage('FastMarching finished', 2000)
+      if npoints:
+        self.marcher.minimum = 0
+        self.marcher.maximum = npoints
+        self.marcher.singleStep = 1
+        self.marcher.enabled = 1
     except IndexError:
       print('No tools available!')
       pass
 
   def onMarcherChanged(self,value):
-    try:
-      tool = self.tools[0]
-      tool.updateLabel(value)
-    except IndexError:
-      print('No tools available!')
-      pass
+    self.logic.updateLabel(value/self.marcher.maximum)
 
   def percentMaxChanged(self, val):
-    try:
-      tool = self.tools[0]
-    except IndexError:
-      print('No tools available!')
-      return
-
+    labelNode = self.logic.getLabelNode()
     labelImage = self.editUtil.getLabelImage()
     dim = labelImage.GetWholeExtent()
-    volumeNode = tool.getVolumeNode()
-    spacing = volumeNode.GetSpacing()
+    spacing = labelNode.GetSpacing()
     totalVolume = spacing[0]*(dim[1]+1)+spacing[1]*(dim[3]+1)+spacing[2]*(dim[5]+1)
     percentVolumeStr = "%.5f" % (totalVolume*val/100.)
     self.percentVolume.text = '(maximum total volume: '+percentVolumeStr+' mL)'
@@ -164,7 +167,6 @@ class FastMarchingEffectTool(Effect.EffectTool):
   def __init__(self, sliceWidget):
     super(FastMarchingEffectTool,self).__init__(sliceWidget)
 
-    self.fm = None
 
   def cleanup(self):
     super(FastMarchingEffectTool,self).cleanup()
@@ -175,88 +177,8 @@ class FastMarchingEffectTool(Effect.EffectTool):
     """
     return
 
-  def apply(self, percentMax):
-
-    # allocate a new filter each time apply is hit
-    bgImage = self.editUtil.getBackgroundImage()
-    labelImage = self.editUtil.getLabelImage()
-
-    # collect seeds
-    dim = bgImage.GetWholeExtent()
-    # initialize the filter
-    self.fm = slicer.logic.vtkPichonFastMarching()
-    scalarRange = bgImage.GetScalarRange()
-    depth = scalarRange[1]-scalarRange[0]
-
-    if depth>300:
-      scaleValue = 300./depth
-      rescale = vtk.vtkImageShiftScale()
-      rescale.SetInput(bgImage)
-      rescale.SetScale(scaleValue)
-      rescale.SetShift(0)
-      rescale.Update()
-      bgImage = rescale.GetOutput()
-      depth = 300
-
-    print('Input scalar range: '+str(depth))
-    self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
-    self.fm.SetInput(bgImage)
-    # self.fm.SetOutput(labelImage)
-
-    npoints = int((dim[1]+1)*(dim[3]+1)*(dim[5]+1)*percentMax/100.)
-
-    self.fm.setNPointsEvolution(npoints)
-    print('Setting active label to '+str(self.editUtil.getLabel()))
-    self.fm.setActiveLabel(self.editUtil.getLabel())
-
-    self.fm.addSeedsFromImage(labelImage)
-
-    '''
-    # use all initialized points in the label volume as seeds
-    for i in range(dim[1]+1):
-      for j in range(dim[3]+1):
-        for k in range(dim[5]+1):
-          labelValue = labelImage.GetScalarComponentAsFloat(i,j,k,0)
-          if labelValue:
-            self.fm.addSeedIJK(i,j,k)
-    '''
-
-    self.fm.Modified()
-    self.fm.Update()
-
-    # TODO: need to call show() twice for data to be updated
-    self.fm.show(1)
-    self.fm.Modified()
-    self.fm.Update()
-
-    self.fm.show(1)
-    self.fm.Modified()
-    self.fm.Update()
-
-
-    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
-    self.editUtil.getLabelImage().Modified()
-
-    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
-
-    print('FastMarching apply update completed')
-
-  def updateLabel(self,value):
-    if not self.fm:
-      return
-    self.fm.show(value)
-    self.fm.Modified()
-    self.fm.Update()
-
-    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
-    self.editUtil.getLabelImage().Modified()
-
-    self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode().Modified()
-
   def getVolumeNode(self):
     return self.sliceWidget.sliceLogic().GetLabelLayer().GetVolumeNode()
-
-
 #
 # FastMarchingEffectLogic
 #
@@ -273,10 +195,100 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
   """
 
   def __init__(self,sliceLogic):
-    self.sliceLogic = sliceLogic
+    super(FastMarchingEffectLogic,self).__init__(sliceLogic)
 
-  def apply(self,xy):
-    pass
+  def fastMarching(self,percentMax):
+
+    self.fm = None
+    # allocate a new filter each time apply is hit
+    bgImage = self.editUtil.getBackgroundImage()
+    labelImage = self.editUtil.getLabelImage()
+
+    # collect seeds
+    dim = bgImage.GetWholeExtent()
+    # initialize the filter
+    self.fm = slicer.logic.vtkPichonFastMarching()
+    scalarRange = bgImage.GetScalarRange()
+    depth = scalarRange[1]-scalarRange[0]
+
+    # this is more or less arbitrary; large depth values will bring the
+    # algorithm to the knees
+    scaleValue = 0
+    shiftValue = 0
+
+    if depth>300:
+      scaleValue = 300./depth
+    if scalarRange[0] < 0:
+      shiftValue = scalarRange[0]*-1
+
+    if scaleValue or shiftValue:
+      rescale = vtk.vtkImageShiftScale()
+      rescale.SetInput(bgImage)
+      rescale.SetScale(scaleValue)
+      rescale.SetShift(shiftValue)
+      rescale.Update()
+      bgImage = rescale.GetOutput()
+      scalarRange = bgImage.GetScalarRange()
+      depth = scalarRange[1]-scalarRange[0]
+
+    print('Input scalar range: '+str(depth))
+    self.fm.init(dim[1]+1, dim[3]+1, dim[5]+1, depth, 1, 1, 1)
+
+    caster = vtk.vtkImageCast()
+    caster.SetOutputScalarTypeToShort()
+    caster.SetInput(bgImage)
+    caster.Update()
+
+    self.fm.SetInput(caster.GetOutput())
+    # self.fm.SetOutput(labelImage)
+
+    npoints = int((dim[1]+1)*(dim[3]+1)*(dim[5]+1)*percentMax/100.)
+
+    self.fm.setNPointsEvolution(npoints)
+    print('Setting active label to '+str(self.editUtil.getLabel()))
+    self.fm.setActiveLabel(self.editUtil.getLabel())
+
+    nSeeds = self.fm.addSeedsFromImage(labelImage)
+    if nSeeds == 0:
+      return 0
+
+    self.fm.Modified()
+    self.fm.Update()
+
+    # TODO: need to call show() twice for data to be updated
+    self.fm.show(1)
+    self.fm.Modified()
+    self.fm.Update()
+
+    self.fm.show(1)
+    self.fm.Modified()
+    self.fm.Update()
+
+    self.undoRedo.saveState()
+
+    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
+    self.editUtil.getLabelImage().Modified()
+
+    self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
+    # print('FastMarching output image: '+str(output))
+    print('FastMarching apply update completed')
+
+    return npoints
+
+  def updateLabel(self,value):
+    if not self.fm:
+      return
+    self.fm.show(value)
+    self.fm.Modified()
+    self.fm.Update()
+
+    self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
+    self.editUtil.getLabelImage().Modified()
+    
+    self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
+
+  def getLabelNode(self):
+    return self.sliceLogic.GetLabelLayer().GetVolumeNode()
 
 
 #
@@ -303,7 +315,7 @@ class FastMarchingEffectExtension(Effect.Effect):
 # FastMarchingEffect
 #
 
-class FastMarchingEffect:
+class FastMarchingEffect(): #Effect.Effect):
   """
   This class is the 'hook' for slicer to detect and recognize the extension
   as a loadable scripted module
@@ -337,10 +349,15 @@ class FastMarchingEffect:
       slicer.modules.editorExtensions = {}
     slicer.modules.editorExtensions['FastMarchingEffect'] = FastMarchingEffectExtension
 
+    '''
+    self.options = FastMarchingEffectOptions
+    self.tool = FastMarchingEffectTool
+    self.logic = FastMarchingEffectLogic
+    '''
 #
 # FastMarchingEffectWidget
 #
-
+'''
 class FastMarchingEffectWidget:
   def __init__(self, parent = None):
     self.parent = parent
@@ -354,3 +371,4 @@ class FastMarchingEffectWidget:
 
   def exit(self):
     pass
+'''
