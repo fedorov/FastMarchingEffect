@@ -74,7 +74,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.marcher.minimum = 0
     self.marcher.maximum = 1
     self.marcher.singleStep = 0.01
-    self.marcher.enabled = 0
+    self.marcher.enabled = False
     self.frame.layout().addWidget(self.marcher)
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
@@ -121,8 +121,9 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
       if npoints:
         self.marcher.minimum = 0
         self.marcher.maximum = npoints
+        self.marcher.value = npoints
         self.marcher.singleStep = 1
-        self.marcher.enabled = 1
+        self.marcher.enabled = True
     except IndexError:
       print('No tools available!')
       pass
@@ -284,7 +285,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
-    
+ 
     self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
 
   def getLabelNode(self):
@@ -315,13 +316,13 @@ class FastMarchingEffectExtension(Effect.Effect):
 # FastMarchingEffect
 #
 
-class FastMarchingEffect(): #Effect.Effect):
+class FastMarchingEffect():
   """
   This class is the 'hook' for slicer to detect and recognize the extension
   as a loadable scripted module
   """
   def __init__(self, parent):
-    parent.title = "Editor FastMarchingEffect Effect"
+    parent.title = "Editor FastMarching Effect"
     parent.categories = ["Developer Tools.Editor Extensions"]
     parent.contributors = ["Andrey Fedorov (BWH)", "Steve Pieper (Isomics)", "Ron Kikinis (BWH)"] # insert your name in the list
     parent.hidden = True
@@ -348,27 +349,3 @@ class FastMarchingEffect(): #Effect.Effect):
     except AttributeError:
       slicer.modules.editorExtensions = {}
     slicer.modules.editorExtensions['FastMarchingEffect'] = FastMarchingEffectExtension
-
-    '''
-    self.options = FastMarchingEffectOptions
-    self.tool = FastMarchingEffectTool
-    self.logic = FastMarchingEffectLogic
-    '''
-#
-# FastMarchingEffectWidget
-#
-'''
-class FastMarchingEffectWidget:
-  def __init__(self, parent = None):
-    self.parent = parent
-
-  def setup(self):
-    # don't display anything for this widget - it will be hidden anyway
-    pass
-
-  def enter(self):
-    pass
-
-  def exit(self):
-    pass
-'''
