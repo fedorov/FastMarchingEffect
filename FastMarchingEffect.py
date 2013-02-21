@@ -13,7 +13,7 @@ from EditorLib import Effect
 #
 
 #
-# FastMarchingEffectOptions - see LabelEffect, EditOptions and Effect for superclasses
+# FastMarchingEffectOptions - see EditOptions and Effect for superclasses
 #
 
 class FastMarchingEffectOptions(Effect.EffectOptions):
@@ -55,33 +55,33 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.widgets.append(self.percentMax)
     self.percentMax.connect('valueChanged(double)', self.percentMaxChanged)
 
-    self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
-    self.percentVolume.setToolTip('Total maximum volume')
-    self.frame.layout().addWidget(self.percentVolume)
-    self.widgets.append(self.percentVolume)
-
-    self.apply = qt.QPushButton("Apply", self.frame)
-    self.apply.setToolTip("Apply the extension operation")
-    self.frame.layout().addWidget(self.apply)
-    self.widgets.append(self.apply)
-
     self.marcherLabel = qt.QLabel('March:',self.frame)
     self.marcherLabel.setToolTip('March over the front propagation timeline')
     self.frame.layout().addWidget(self.marcherLabel)
     self.widgets.append(self.marcherLabel)
 
+    self.march = qt.QPushButton("March", self.frame)
+    self.march.setToolTip("Perform the Marching operatino into the current label map")
+    self.frame.layout().addWidget(self.march)
+    self.widgets.append(self.march)
+
+    self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
+    self.percentVolume.setToolTip('Total maximum volume')
+    self.frame.layout().addWidget(self.percentVolume)
+    self.widgets.append(self.percentVolume)
+
     self.marcher = ctk.ctkSliderWidget(self.frame)
     self.marcher.minimum = 0
     self.marcher.maximum = 1
     self.marcher.singleStep = 0.01
-    self.marcher.enabled = 0
+    self.marcher.enabled = False
     self.frame.layout().addWidget(self.marcher)
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
 
-    HelpButton(self.frame, "To use FastMarching effect, first mark the areas that belong to the structure of interest to initialize the algorithm. Define the expected volume of the structure you are trying to segment, and hit Apply.\nAfter computation is complete, use the Marcher slider to go over the segmentation history.")
+    HelpButton(self.frame, "To use FastMarching effect, first mark the areas that belong to the structure of interest to initialize the algorithm. Define the expected volume of the structure you are trying to segment, and hit March.\nAfter computation is complete, use the Marcher slider to go over the segmentation history.")
 
-    self.apply.connect('clicked()', self.onApply)
+    self.march.connect('clicked()', self.onMarch)
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -110,10 +110,9 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.disconnectWidgets()
     # TODO: get the march parameter from the node
     # march = float(self.parameterNode.GetParameter
-
     self.connectWidgets()
 
-  def onApply(self):
+  def onMarch(self):
     try:
       slicer.util.showStatusMessage('Running FastMarching...', 2000)
       self.logic.undoRedo = self.undoRedo
@@ -122,12 +121,13 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
       if npoints:
         self.marcher.minimum = 0
         self.marcher.maximum = npoints
+        self.marcher.value = npoints
         self.marcher.singleStep = 1
-        self.marcher.enabled = 1
+        self.marcher.enabled = True
     except IndexError:
       print('No tools available!')
       pass
-    
+
   def onMarcherChanged(self,value):
     self.logic.updateLabel(value/self.marcher.maximum)
 
@@ -139,7 +139,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     totalVolume = spacing[0]*(dim[1]+1)+spacing[1]*(dim[3]+1)+spacing[2]*(dim[5]+1)
     percentVolumeStr = "%.5f" % (totalVolume*val/100.)
     self.percentVolume.text = '(maximum total volume: '+percentVolumeStr+' mL)'
-  
+
   def updateMRMLFromGUI(self):
     if self.updatingGUI:
       return
@@ -201,7 +201,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
   def fastMarching(self,percentMax):
 
     self.fm = None
-    # allocate a new filter each time apply is hit
+    # allocate a new filter each time March is hit
     bgImage = self.editUtil.getBackgroundImage()
     labelImage = self.editUtil.getLabelImage()
 
@@ -256,6 +256,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
     self.fm.Modified()
     self.fm.Update()
 
+    # TODO: need to call show() twice for data to be updated
     self.fm.show(1)
     self.fm.Modified()
     self.fm.Update()
@@ -271,8 +272,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
     # print('FastMarching output image: '+str(output))
-    
-    print('FastMarching apply update completed')
+    print('FastMarching march update completed')
 
     return npoints
 
@@ -285,7 +285,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     self.editUtil.getLabelImage().DeepCopy(self.fm.GetOutput())
     self.editUtil.getLabelImage().Modified()
-    
+ 
     self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
 
   def getLabelNode(self):
@@ -305,33 +305,27 @@ class FastMarchingEffectExtension(Effect.Effect):
     # name is used to define the name of the icon image resource (e.g. FastMarchingEffect.png)
     self.name = "FastMarchingEffect"
     # tool tip is displayed on mouse hover
-    self.toolTip = "Paint: circular paint brush for label map editing"
+    self.toolTip = "FastMarchingEffect - a similarity based 3D region growing"
 
     self.options = FastMarchingEffectOptions
     self.tool = FastMarchingEffectTool
     self.logic = FastMarchingEffectLogic
 
-""" Test:
-
-sw = slicer.app.layoutManager().sliceWidget('Red')
-import EditorLib
-pet = EditorLib.FastMarchingEffectTool(sw)
-
-"""
 
 #
 # FastMarchingEffect
 #
 
-class FastMarchingEffect(): #Effect.Effect):
+class FastMarchingEffect():
   """
   This class is the 'hook' for slicer to detect and recognize the extension
   as a loadable scripted module
   """
   def __init__(self, parent):
-    parent.title = "Editor FastMarchingEffect Effect"
+    parent.title = "Editor FastMarching Effect"
     parent.categories = ["Developer Tools.Editor Extensions"]
     parent.contributors = ["Andrey Fedorov (BWH)", "Steve Pieper (Isomics)", "Ron Kikinis (BWH)"] # insert your name in the list
+    parent.hidden = True
     parent.helpText = """
     FastMarching segmentation based on work of Eric Pichon.
     """
@@ -346,9 +340,6 @@ class FastMarchingEffect(): #Effect.Effect):
     and was partially funded by NIH grant 3P41RR013218.
     """
 
-    # TODO:
-    # don't show this module - it only appears in the Editor module
-    #parent.hidden = True
 
     # Add this extension to the editor's list for discovery when the module
     # is created.  Since this module may be discovered before the Editor itself,
@@ -358,28 +349,3 @@ class FastMarchingEffect(): #Effect.Effect):
     except AttributeError:
       slicer.modules.editorExtensions = {}
     slicer.modules.editorExtensions['FastMarchingEffect'] = FastMarchingEffectExtension
-
-    '''
-    self.options = FastMarchingEffectOptions
-    self.tool = FastMarchingEffectTool
-    self.logic = FastMarchingEffectLogic
-    '''
-#
-# FastMarchingEffectWidget
-#
-'''
-class FastMarchingEffectWidget:
-  def __init__(self, parent = None):
-    self.parent = parent
-
-  def setup(self):
-    # don't display anything for this widget - it will be hidden anyway
-    pass
-
-  def enter(self):
-    pass
-
-  def exit(self):
-    pass
-'''
-
