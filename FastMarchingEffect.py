@@ -55,20 +55,20 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.widgets.append(self.percentMax)
     self.percentMax.connect('valueChanged(double)', self.percentMaxChanged)
 
-    self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
-    self.percentVolume.setToolTip('Total maximum volume')
-    self.frame.layout().addWidget(self.percentVolume)
-    self.widgets.append(self.percentVolume)
+    self.marcherLabel = qt.QLabel('March:',self.frame)
+    self.marcherLabel.setToolTip('March over the front propagation timeline')
+    self.frame.layout().addWidget(self.marcherLabel)
+    self.widgets.append(self.marcherLabel)
 
     self.apply = qt.QPushButton("Apply", self.frame)
     self.apply.setToolTip("Apply the extension operation")
     self.frame.layout().addWidget(self.apply)
     self.widgets.append(self.apply)
 
-    self.marcherLabel = qt.QLabel('March:',self.frame)
-    self.marcherLabel.setToolTip('March over the front propagation timeline')
-    self.frame.layout().addWidget(self.marcherLabel)
-    self.widgets.append(self.marcherLabel)
+    self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
+    self.percentVolume.setToolTip('Total maximum volume')
+    self.frame.layout().addWidget(self.percentVolume)
+    self.widgets.append(self.percentVolume)
 
     self.marcher = ctk.ctkSliderWidget(self.frame)
     self.marcher.minimum = 0
