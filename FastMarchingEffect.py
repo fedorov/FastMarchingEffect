@@ -60,10 +60,10 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.frame.layout().addWidget(self.marcherLabel)
     self.widgets.append(self.marcherLabel)
 
-    self.apply = qt.QPushButton("Apply", self.frame)
-    self.apply.setToolTip("Apply the extension operation")
-    self.frame.layout().addWidget(self.apply)
-    self.widgets.append(self.apply)
+    self.march = qt.QPushButton("March", self.frame)
+    self.march.setToolTip("Perform the Marching operatino into the current label map")
+    self.frame.layout().addWidget(self.march)
+    self.widgets.append(self.march)
 
     self.percentVolume = qt.QLabel('Maximum volume of the structure: ')
     self.percentVolume.setToolTip('Total maximum volume')
@@ -79,9 +79,9 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     self.widgets.append(self.marcher)
     self.marcher.connect('valueChanged(double)',self.onMarcherChanged)
 
-    HelpButton(self.frame, "To use FastMarching effect, first mark the areas that belong to the structure of interest to initialize the algorithm. Define the expected volume of the structure you are trying to segment, and hit Apply.\nAfter computation is complete, use the Marcher slider to go over the segmentation history.")
+    HelpButton(self.frame, "To use FastMarching effect, first mark the areas that belong to the structure of interest to initialize the algorithm. Define the expected volume of the structure you are trying to segment, and hit March.\nAfter computation is complete, use the Marcher slider to go over the segmentation history.")
 
-    self.apply.connect('clicked()', self.onApply)
+    self.march.connect('clicked()', self.onMarch)
 
     # Add vertical spacer
     self.frame.layout().addStretch(1)
@@ -112,7 +112,7 @@ class FastMarchingEffectOptions(Effect.EffectOptions):
     # march = float(self.parameterNode.GetParameter
     self.connectWidgets()
 
-  def onApply(self):
+  def onMarch(self):
     try:
       slicer.util.showStatusMessage('Running FastMarching...', 2000)
       self.logic.undoRedo = self.undoRedo
@@ -201,7 +201,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
   def fastMarching(self,percentMax):
 
     self.fm = None
-    # allocate a new filter each time apply is hit
+    # allocate a new filter each time March is hit
     bgImage = self.editUtil.getBackgroundImage()
     labelImage = self.editUtil.getLabelImage()
 
@@ -272,7 +272,7 @@ class FastMarchingEffectLogic(Effect.EffectLogic):
 
     self.sliceLogic.GetLabelLayer().GetVolumeNode().Modified()
     # print('FastMarching output image: '+str(output))
-    print('FastMarching apply update completed')
+    print('FastMarching march update completed')
 
     return npoints
 
